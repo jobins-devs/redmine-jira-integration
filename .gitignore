@@ -1,0 +1,223 @@
+# ==============================================
+# Laravel Framework
+# ==============================================
+# Composer dependencies
+/vendor/
+
+# Node.js dependencies (pnpm creates node_modules)
+/node_modules/
+
+# Compiled frontend assets (Vite output)
+/public/build/
+/public/hot
+/public/storage
+
+# Storage encryption keys
+/storage/*.key
+
+# Laravel development environment files
+Homestead.json
+Homestead.yaml
+Vagrantfile
+.vagrant/
+
+# ==============================================
+# Environment & Configuration
+# ==============================================
+# Environment files with secrets (NEVER COMMIT!)
+.env
+.env.*
+!.env.example
+
+# Composer authentication credentials
+auth.json
+
+# ==============================================
+# Security - Private Keys & Certificates
+# ==============================================
+# Private keys and certificates (NEVER COMMIT!)
+*.key
+*.pem
+*.p12
+*.crt
+*.cer
+*.pfx
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ecdsa
+id_ecdsa.pub
+
+# ==============================================
+# Storage & Cache
+# ==============================================
+# Framework cache
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+
+# Session files
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+
+# Compiled views
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+
+# Log files
+/storage/logs/*.log
+
+# Testing cache
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+
+# ==============================================
+# Testing & Coverage
+# ==============================================
+# PHPUnit cache and results
+/.phpunit.cache
+.phpunit.result.cache
+
+# Code coverage reports
+/coverage/
+/coverage.xml
+/.coverage
+/htmlcov/
+
+# ==============================================
+# IDE & Editor Files
+# ==============================================
+# PhpStorm / IntelliJ IDEA
+/.idea/
+/.fleet/
+
+# VS Code
+/.vscode/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# IDE Helper files (Laravel IDE Helper package)
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# ==============================================
+# Package Manager Logs & Debug Files
+# ==============================================
+# npm logs
+npm-debug.log*
+npm-error.log*
+
+# Yarn logs
+yarn-debug.log*
+yarn-error.log*
+
+# pnpm logs
+pnpm-debug.log*
+
+# ==============================================
+# Build Artifacts & Compiled Files
+# ==============================================
+# Vite build artifacts
+/public/build/
+/public/hot
+
+# Laravel Mix (legacy)
+/public/mix-manifest.json
+
+# ==============================================
+# Database Files
+# ==============================================
+# SQLite databases
+/database/*.sqlite
+/database/*.sqlite-journal
+/database/*.sqlite-shm
+/database/*.sqlite-wal
+
+# ==============================================
+# Deployment
+# ==============================================
+# Deployer cache and temporary files
+/.deployer/
+.dep/
+
+# NOTE: .github/ workflows are NOT ignored (needed for CI/CD)
+# NOTE: deploy.php is NOT ignored (needed for deployment)
+
+# ==============================================
+# Logs
+# ==============================================
+# All log files
+*.log
+
+# Laravel logs
+/storage/logs/*.log
+
+# ==============================================
+# Temporary Files
+# ==============================================
+/tmp/
+*.tmp
+*.bak
+*.cache
+*.swp
+
+# ==============================================
+# OS-Specific Files
+# ==============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ==============================================
+# Additional Security Exclusions
+# ==============================================
+# Backup files that might contain sensitive data
+*.sql
+*.sql.gz
+*.dump
+*.backup
+
+# ==============================================
+# Files That SHOULD Be Tracked
+# ==============================================
+# These files are explicitly NOT ignored:
+# - .env.example (environment template)
+# - pnpm-lock.yaml (lockfile for reproducible builds)
+# - composer.lock (PHP dependency lockfile)
+# - package.json (Node.js dependencies)
+# - .github/workflows/ (CI/CD workflows)
+# - deploy.php (Deployer configuration)
+# - docs/ (all documentation files)
+# ==============================================
+
