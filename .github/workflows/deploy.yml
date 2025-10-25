@@ -46,18 +46,62 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
         
-      - name: Copy .env file
-        run: cp .env.example .env
-        
+      - name: Prepare Laravel storage directories
+        run: |
+          # Ensure all required storage directories exist
+          mkdir -p storage/framework/cache/data
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/framework/testing
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+
+          # Set proper permissions
+          chmod -R 775 storage bootstrap/cache
+
+          echo "✓ Storage directories created and permissions set"
+
+      - name: Copy .env file for testing
+        run: |
+          # Use .env.testing if it exists, otherwise use .env.example
+          if [ -f .env.testing ]; then
+            cp .env.testing .env
+            echo "✓ Using .env.testing configuration"
+          else
+            cp .env.example .env
+            echo "✓ Using .env.example configuration"
+          fi
+
       - name: Generate application key
         run: php artisan key:generate
-        
+
       - name: Create SQLite database
-        run: touch database/database.sqlite
-        
+        run: |
+          # Create database file if not using in-memory database
+          if ! grep -q "DB_DATABASE=:memory:" .env; then
+            touch database/database.sqlite
+            echo "✓ SQLite database file created"
+          else
+            echo "✓ Using in-memory SQLite database"
+          fi
+
       - name: Run database migrations
         run: php artisan migrate --force
-        
+
+      - name: Prepare application for testing
+        run: |
+          # Clear and rebuild caches
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan view:clear
+          php artisan route:clear
+
+          # Optimize for testing
+          php artisan config:cache
+          php artisan route:cache
+
+          echo "✓ Application prepared for testing"
+
       - name: Run PHPStan static analysis
         run: ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
         
@@ -160,8 +204,20 @@ jobs:
           extensions: mbstring, xml, ctype, json, bcmath
           coverage: none
           
-      - name: Install Composer dependencies (production)
-        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
+      - name: Install Composer dependencies (including Deployer)
+        run: |
+          # Install all dependencies including dev dependencies for deployment tools
+          # Deployer is in require-dev but needed for deployment
+          composer install --optimize-autoloader --no-interaction --no-progress --prefer-dist
+
+          # Verify Deployer is installed
+          if [ -f vendor/bin/dep ]; then
+            echo "✓ Deployer installed successfully"
+            vendor/bin/dep --version
+          else
+            echo "❌ Deployer not found!"
+            exit 1
+          fi
         
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -209,10 +265,40 @@ jobs:
       - name: Test SSH connection
         run: |
           echo "Testing SSH connection to server..."
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 jobins-rji@${{ secrets.SERVER_HOST }} "echo '✓ SSH connection successful'" || {
-            echo "⚠ SSH connection test failed, but deployment will continue..."
-            echo "The deployment may fail if SSH is not properly configured."
-          }
+          echo "Server: ${{ secrets.SERVER_HOST }}"
+          echo "User: jobins-rji"
+          echo ""
+
+          # Test SSH connection with detailed output
+          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -v jobins-rji@${{ secrets.SERVER_HOST }} "echo '✓ SSH connection successful'" 2>&1 | tee /tmp/ssh-test.log; then
+            echo ""
+            echo "✅ SSH connection test PASSED"
+          else
+            echo ""
+            echo "❌ SSH connection test FAILED"
+            echo ""
+            echo "Possible reasons:"
+            echo "1. Server is on a private network (10.10.0.110 suggests private IP)"
+            echo "2. Firewall blocking GitHub Actions IP ranges"
+            echo "3. SSH_PRIVATE_KEY secret is incorrect"
+            echo "4. SERVER_HOST secret is incorrect"
+            echo ""
+            echo "If your server is on a private network, you have two options:"
+            echo "A) Use a self-hosted GitHub Actions runner on the same network"
+            echo "B) Use a jump host/bastion server accessible from the internet"
+            echo ""
+            echo "⚠ Deployment will likely fail if SSH cannot connect"
+            echo ""
+
+            # Check if it's a private IP
+            if [[ "${{ secrets.SERVER_HOST }}" =~ ^10\. ]] || [[ "${{ secrets.SERVER_HOST }}" =~ ^192\.168\. ]] || [[ "${{ secrets.SERVER_HOST }}" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
+              echo "🔍 DETECTED: Server IP appears to be a private network address"
+              echo "   GitHub Actions runners cannot reach private IPs directly"
+              echo ""
+              echo "SOLUTION: Set up a self-hosted runner or use a public IP/jump host"
+              exit 1
+            fi
+          fi
           
       - name: Deploy with Deployer
         env:
