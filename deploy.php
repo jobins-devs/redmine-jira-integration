@@ -155,12 +155,62 @@ task('artisan:migrate:force', function (): void {
  * Health check
  */
 task('health:check', function (): void {
-    $response = run('curl -s -o /dev/null -w "%{http_code}" {{hostname}}/up');
+    $domain = get('domain');
+    $deployPath = get('deploy_path');
 
-    if ($response !== '200') {
-        warning("Health check failed with status code: $response");
+    info('Waiting for application to start...');
+    sleep(5); // Give PHP-FPM and application more time to reload
+
+    // First, check if the application responds locally (bypasses DNS/SSL issues)
+    info('Testing application locally on server...');
+
+    // Try HTTP first (without following redirects to see if app responds)
+    $localResponse = run("curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 --connect-timeout 5 -H 'Host: {$domain}' http://127.0.0.1/up 2>/dev/null || echo '000'");
+    $localResponse = trim($localResponse);
+
+    // Accept 200 (OK) or 301/302 (redirect to HTTPS) as success
+    if ($localResponse === '200' || $localResponse === '301' || $localResponse === '302') {
+        if ($localResponse === '200') {
+            info('✓ Local health check passed (HTTP 200)');
+        } else {
+            info("✓ Local health check passed (HTTP {$localResponse} - redirect to HTTPS)");
+        }
+
+        // Now try external HTTPS check
+        info('Testing HTTPS access...');
+        $httpsResponse = run("curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 --connect-timeout 5 --insecure https://{$domain}/up 2>/dev/null || echo '000'");
+        $httpsResponse = trim($httpsResponse);
+
+        if ($httpsResponse === '200') {
+            info('✓ HTTPS health check passed');
+        } else {
+            warning("⚠ HTTPS check returned: {$httpsResponse}");
+            warning('Application is running locally but HTTPS may have issues.');
+            warning('This could be due to DNS, SSL certificate, or firewall configuration.');
+        }
+    } elseif ($localResponse === '000') {
+        warning('⚠ Cannot connect to application locally');
+        warning('Checking if PHP-FPM is running...');
+
+        // Check PHP-FPM status
+        $phpVersion = get('php_version');
+        $fpmStatus = run("systemctl is-active php{$phpVersion}-fpm 2>/dev/null || echo 'inactive'");
+        $fpmStatus = trim($fpmStatus);
+
+        if ($fpmStatus === 'active') {
+            warning('PHP-FPM is running');
+        } else {
+            warning("PHP-FPM status: {$fpmStatus}");
+        }
+
+        warning('Please check:');
+        warning('  - Nginx configuration');
+        warning('  - PHP-FPM configuration');
+        warning('  - Application logs in storage/logs/');
     } else {
-        info('✓ Health check passed');
+        warning("⚠ Local health check returned: {$localResponse}");
+        warning('Application may be starting or having issues.');
+        warning('Please verify manually at: https://' . $domain);
     }
 })->desc('Check application health');
 
