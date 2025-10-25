@@ -22,7 +22,7 @@ jobs:
   # ==============================================
   test:
     name: Code Quality & Tests
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     steps:
       - name: Checkout code
