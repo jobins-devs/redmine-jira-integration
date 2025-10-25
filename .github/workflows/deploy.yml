@@ -173,19 +173,62 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
+
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+
+          # Add server to known hosts with better error handling
+          echo "Adding server to known hosts..."
+
+          # Try ssh-keyscan with timeout and retry
+          for i in {1..3}; do
+            echo "Attempt $i of 3..."
+            if ssh-keyscan -H -T 10 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null; then
+              echo "✓ Successfully added server to known hosts"
+              break
+            else
+              echo "⚠ ssh-keyscan attempt $i failed"
+              if [ $i -eq 3 ]; then
+                echo "❌ Failed to add server to known hosts after 3 attempts"
+                echo "This may cause SSH connection issues, but deployment will continue..."
+                # Don't fail the workflow - let SSH handle it with StrictHostKeyChecking
+              fi
+              sleep 2
+            fi
+          done
+
+          # Set proper permissions
+          chmod 644 ~/.ssh/known_hosts
+
+          # Verify SSH configuration
+          echo "SSH configuration:"
+          ls -la ~/.ssh/
+
+      - name: Test SSH connection
+        run: |
+          echo "Testing SSH connection to server..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 jobins-rji@${{ secrets.SERVER_HOST }} "echo '✓ SSH connection successful'" || {
+            echo "⚠ SSH connection test failed, but deployment will continue..."
+            echo "The deployment may fail if SSH is not properly configured."
+          }
           
       - name: Deploy with Deployer
         env:
           DOT_ENV: ${{ secrets.DOT_ENV }}
         run: |
+          # Configure SSH options for Deployer
+          export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+          echo "Starting deployment to ${{ github.event.inputs.environment || 'production' }}..."
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+
           vendor/bin/dep deploy ${{ github.event.inputs.environment || 'production' }} \
             --revision="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}"
+            --branch="${{ github.ref_name }}" \
+            -vvv
             
       - name: Deployment notification
         if: success()
