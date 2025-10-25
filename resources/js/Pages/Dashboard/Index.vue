@@ -1,7 +1,6 @@
 
 <script setup>
 import Layout from '@/Components/Layout.vue';
-import { ref, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps({

@@ -16,11 +16,23 @@ set('application', 'redmine-jira-integration');
 // Project repository
 set('repository', 'git@github.com:jobins-devs/redmine-jira-integration.git');
 
-// Deployment user
-set('remote_user', 'deployer');
+set('remote_user', 'jobins-rji');
+
+set('http_user', 'jobins-rji');
+set('http_group', 'jobins-rji');
 
 // Number of releases to keep
 set('keep_releases', 5);
+
+set('bin/php', 'php8.4');
+
+set('bin/composer', '{{bin/php}} /usr/local/bin/composer');
+
+set('writable_mode', 'chmod');
+
+set('writable_chmod_mode', '0775');
+
+set('writable_use_sudo', false);
 
 // Shared files/dirs between deploys
 add('shared_files', [
@@ -51,35 +63,54 @@ add('writable_dirs', [
 host('production')
     ->setHostname('10.10.0.110')
     ->setPort(22)
-    ->setRemoteUser('deployer')
+    ->setRemoteUser('jobins-rji')
     ->setDeployPath('/home/jobins-rji/htdocs/rji.release.jobins.net')
     ->setLabels([
         'stage' => 'production',
-    ]);
+    ])
+    ->set('domain', 'rji.release.jobins.net')
+    ->set('php_version', '8.4');
 
 // Optional: Staging server
 // host('staging')
 //     ->setHostname('staging.example.com')
 //     ->setPort(22)
-//     ->setRemoteUser('deployer')
-//     ->setDeployPath('/var/www/rdi-staging')
+//     ->setRemoteUser('jobins-rji')
+//     ->setDeployPath('/home/jobins-rji/htdocs/staging.domain.com')
 //     ->setLabels([
 //         'stage' => 'staging',
-//     ]);
+//     ])
+//     ->set('domain', 'staging.domain.com')
+//     ->set('php_version', '8.2');
 
 // ==============================================
 // CUSTOM TASKS
 // ==============================================
 
 /**
- * Build frontend assets with pnpm
+ * Install Node.js dependencies with pnpm
  */
 task('pnpm:install', function (): void {
     run('cd {{release_path}} && pnpm install --frozen-lockfile --prefer-offline');
-})->desc('Install dependencies with pnpm');
+})->desc('Install Node.js dependencies with pnpm');
 
+/**
+ * Fix node_modules permissions
+ * CloudPanel: Ensure binaries in node_modules have execute permissions
+ * This is needed for esbuild and other native binaries
+ */
+task('pnpm:fix-permissions', function (): void {
+    run('cd {{release_path}} && find node_modules -type f -name "*.node" -exec chmod +x {} \;');
+    run('cd {{release_path}} && find node_modules/.bin -type f -exec chmod +x {} \; 2>/dev/null || true');
+    run('cd {{release_path}} && find node_modules -type f -path "*/bin/*" -exec chmod +x {} \; 2>/dev/null || true');
+    info('✓ node_modules permissions fixed');
+})->desc('Fix node_modules binary permissions');
+
+/**
+ * Build frontend assets with pnpm
+ */
 task('pnpm:build', function (): void {
-    run('cd {{release_path}} && pnpm run build');
+    run('cd {{release_path}} && NODE_ENV=production pnpm run build');
 })->desc('Build frontend assets with pnpm');
 
 /**
@@ -137,7 +168,9 @@ task('health:check', function (): void {
  * Reload PHP-FPM
  */
 task('php-fpm:reload', function (): void {
-    run('sudo systemctl reload php8.2-fpm');
+    $phpVersion = get('php_version');
+    run("sudo systemctl reload php{$phpVersion}-fpm");
+    info("✓ PHP {$phpVersion}-FPM reloaded");
 })->desc('Reload PHP-FPM service');
 
 /**
@@ -145,7 +178,16 @@ task('php-fpm:reload', function (): void {
  */
 task('nginx:reload', function (): void {
     run('sudo systemctl reload nginx');
+    info('✓ Nginx reloaded');
 })->desc('Reload Nginx service');
+
+task('cloudpanel:permissions:reset', function (): void {
+    $deployPath = get('deploy_path');
+    $currentPath = "{$deployPath}/current";
+    run("clpctl system:permissions:reset --directories=770 --files=660 --path={$currentPath}");
+    run("chmod -R 775 {$currentPath}/storage {$currentPath}/bootstrap/cache");
+    info('✓ CloudPanel permissions reset');
+})->desc('Reset permissions using CloudPanel CLI');
 
 // ==============================================
 // DEPLOYMENT FLOW
@@ -158,14 +200,17 @@ task('deploy', [
     'deploy:prepare',
     'deploy:vendors',
     'pnpm:install',
+    'pnpm:fix-permissions',
     'pnpm:build',
     'artisan:storage:link',
     'artisan:migrate:force',
     'artisan:cache:all',
     'artisan:optimize',
     'deploy:publish',
+    'cloudpanel:permissions:reset',
     'artisan:queue:restart',
     'php-fpm:reload',
+    'nginx:reload',
     'health:check',
 ])->desc('Deploy the application');
 
@@ -182,15 +227,29 @@ after('deploy:success', function (): void {
 // ==============================================
 
 /**
- * Rollback task
+ * Clear caches after rollback
  */
-task('rollback', [
-    'rollback:prepare',
-    'artisan:cache:clear',
-    'artisan:queue:restart',
-    'php-fpm:reload',
-    'health:check',
-])->desc('Rollback to previous release');
+task('rollback:cache:clear', function (): void {
+    run('cd {{deploy_path}}/current && {{bin/php}} artisan cache:clear');
+    run('cd {{deploy_path}}/current && {{bin/php}} artisan config:clear');
+    run('cd {{deploy_path}}/current && {{bin/php}} artisan route:clear');
+    run('cd {{deploy_path}}/current && {{bin/php}} artisan view:clear');
+})->desc('Clear all caches after rollback');
+
+/**
+ * Restart queue after rollback
+ */
+task('rollback:queue:restart', function (): void {
+    run('cd {{deploy_path}}/current && {{bin/php}} artisan queue:restart');
+})->desc('Restart queue workers after rollback');
+
+/**
+ * Rollback hooks - extend the default rollback task from Laravel recipe
+ * The rollback task is already defined in recipe/laravel.php
+ */
+after('rollback', 'rollback:cache:clear');
+after('rollback:cache:clear', 'rollback:queue:restart');
+after('rollback:queue:restart', 'php-fpm:reload');
 
 after('rollback', function (): void {
     info('✓ Rollback completed successfully!');
@@ -230,6 +289,39 @@ task('queue:status', function (): void {
 task('queue:restart-service', function (): void {
     run('sudo systemctl restart rdi-queue-worker');
 })->desc('Restart queue worker systemd service');
+
+task('cloudpanel:info', function (): void {
+    $deployPath = get('deploy_path');
+    $domain = get('domain');
+    $phpVersion = get('php_version');
+    $remoteUser = get('remote_user');
+
+    info("CloudPanel Site Information:");
+    info("  Domain: {$domain}");
+    info("  Deploy Path: {$deployPath}");
+    info("  Site User: {$remoteUser}");
+    info("  PHP Version: {$phpVersion}");
+    info("  Current Release: " . run("readlink {$deployPath}/current 2>/dev/null || echo 'Not deployed yet'"));
+})->desc('Show CloudPanel site information');
+
+task('cloudpanel:php-fpm:status', function (): void {
+    $phpVersion = get('php_version');
+    run("sudo systemctl status php{$phpVersion}-fpm --no-pager");
+})->desc('Check PHP-FPM pool status');
+
+task('cloudpanel:nginx:status', function (): void {
+    run('sudo systemctl status nginx --no-pager');
+})->desc('Check Nginx status');
+
+task('cloudpanel:nginx:test', function (): void {
+    run('sudo nginx -t');
+})->desc('Test Nginx configuration');
+
+task('cloudpanel:disk:usage', function (): void {
+    $deployPath = get('deploy_path');
+    info("Disk usage for deployment:");
+    run("du -sh {$deployPath}/*");
+})->desc('Show disk usage for deployment');
 
 // ==============================================
 // FAILURE HANDLING

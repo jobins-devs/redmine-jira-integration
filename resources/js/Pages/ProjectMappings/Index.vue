@@ -59,7 +59,7 @@ const loadJiraProjects = async () => {
 const selectRedmineProject = (event) => {
     const project = redmineProjects.value.find(p => p.id == event.target.value);
     if (project) {
-        form.redmine_project_id = project.id;
+        form.redmine_project_id = String(project.id);
         form.redmine_project_name = project.name;
     }
 };
@@ -185,7 +185,23 @@ const getSyncDirectionIcon = (direction) => {
                         <form @submit.prevent="submit">
                             <div class="px-4 py-5 sm:p-6">
                                 <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Project Mapping</h3>
-                                
+
+                                <!-- General Error Message -->
+                                <div v-if="Object.keys(form.errors).length > 0" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                                    <div class="flex">
+                                        <div class="flex-shrink-0">
+                                            <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div class="ml-3">
+                                            <h3 class="text-sm font-medium text-red-800">
+                                                There were errors with your submission
+                                            </h3>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="space-y-4">
                                     <!-- Redmine Connection -->
                                     <div>
@@ -194,13 +210,19 @@ const getSyncDirectionIcon = (direction) => {
                                             v-model="form.redmine_connection_id"
                                             @change="loadRedmineProjects"
                                             required
-                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            :class="[
+                                                'mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+                                                form.errors.redmine_connection_id ? 'border-red-300' : 'border-gray-300'
+                                            ]"
                                         >
                                             <option value="">Select a connection</option>
                                             <option v-for="conn in redmineConnections" :key="conn.id" :value="conn.id">
                                                 {{ conn.name }}
                                             </option>
                                         </select>
+                                        <p v-if="form.errors.redmine_connection_id" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.redmine_connection_id }}
+                                        </p>
                                     </div>
 
                                     <!-- Redmine Project -->
@@ -210,13 +232,22 @@ const getSyncDirectionIcon = (direction) => {
                                             @change="selectRedmineProject"
                                             required
                                             :disabled="loadingRedmineProjects"
-                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            :class="[
+                                                'mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+                                                form.errors.redmine_project_id ? 'border-red-300' : 'border-gray-300'
+                                            ]"
                                         >
                                             <option value="">{{ loadingRedmineProjects ? 'Loading...' : 'Select a project' }}</option>
                                             <option v-for="project in redmineProjects" :key="project.id" :value="project.id">
                                                 {{ project.name }}
                                             </option>
                                         </select>
+                                        <p v-if="form.errors.redmine_project_id" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.redmine_project_id }}
+                                        </p>
+                                        <p v-if="form.errors.redmine_project_name" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.redmine_project_name }}
+                                        </p>
                                     </div>
 
                                     <!-- Jira Connection -->
@@ -226,13 +257,19 @@ const getSyncDirectionIcon = (direction) => {
                                             v-model="form.jira_connection_id"
                                             @change="loadJiraProjects"
                                             required
-                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            :class="[
+                                                'mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+                                                form.errors.jira_connection_id ? 'border-red-300' : 'border-gray-300'
+                                            ]"
                                         >
                                             <option value="">Select a connection</option>
                                             <option v-for="conn in jiraConnections" :key="conn.id" :value="conn.id">
                                                 {{ conn.name }}
                                             </option>
                                         </select>
+                                        <p v-if="form.errors.jira_connection_id" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.jira_connection_id }}
+                                        </p>
                                     </div>
 
                                     <!-- Jira Project -->
@@ -242,23 +279,41 @@ const getSyncDirectionIcon = (direction) => {
                                             @change="selectJiraProject"
                                             required
                                             :disabled="loadingJiraProjects"
-                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            :class="[
+                                                'mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+                                                form.errors.jira_project_key ? 'border-red-300' : 'border-gray-300'
+                                            ]"
                                         >
                                             <option value="">{{ loadingJiraProjects ? 'Loading...' : 'Select a project' }}</option>
                                             <option v-for="project in jiraProjects" :key="project.key" :value="project.key">
                                                 {{ project.name }} ({{ project.key }})
                                             </option>
                                         </select>
+                                        <p v-if="form.errors.jira_project_key" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.jira_project_key }}
+                                        </p>
+                                        <p v-if="form.errors.jira_project_name" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.jira_project_name }}
+                                        </p>
                                     </div>
 
                                     <!-- Sync Direction -->
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Sync Direction</label>
-                                        <select v-model="form.sync_direction" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <select
+                                            v-model="form.sync_direction"
+                                            :class="[
+                                                'mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+                                                form.errors.sync_direction ? 'border-red-300' : 'border-gray-300'
+                                            ]"
+                                        >
                                             <option value="bidirectional">Bi-directional (⇄)</option>
                                             <option value="redmine_to_jira">Redmine → Jira</option>
                                             <option value="jira_to_redmine">Jira → Redmine</option>
                                         </select>
+                                        <p v-if="form.errors.sync_direction" class="mt-1 text-sm text-red-600">
+                                            {{ form.errors.sync_direction }}
+                                        </p>
                                     </div>
 
                                     <!-- Enabled -->
