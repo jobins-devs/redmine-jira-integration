@@ -210,7 +210,7 @@ task('health:check', function (): void {
     } else {
         warning("⚠ Local health check returned: {$localResponse}");
         warning('Application may be starting or having issues.');
-        warning('Please verify manually at: https://' . $domain);
+        warning('Please verify manually at: https://'.$domain);
     }
 })->desc('Check application health');
 
@@ -346,12 +346,12 @@ task('cloudpanel:info', function (): void {
     $phpVersion = get('php_version');
     $remoteUser = get('remote_user');
 
-    info("CloudPanel Site Information:");
+    info('CloudPanel Site Information:');
     info("  Domain: {$domain}");
     info("  Deploy Path: {$deployPath}");
     info("  Site User: {$remoteUser}");
     info("  PHP Version: {$phpVersion}");
-    info("  Current Release: " . run("readlink {$deployPath}/current 2>/dev/null || echo 'Not deployed yet'"));
+    info('  Current Release: '.run("readlink {$deployPath}/current 2>/dev/null || echo 'Not deployed yet'"));
 })->desc('Show CloudPanel site information');
 
 task('cloudpanel:php-fpm:status', function (): void {
@@ -369,7 +369,7 @@ task('cloudpanel:nginx:test', function (): void {
 
 task('cloudpanel:disk:usage', function (): void {
     $deployPath = get('deploy_path');
-    info("Disk usage for deployment:");
+    info('Disk usage for deployment:');
     run("du -sh {$deployPath}/*");
 })->desc('Show disk usage for deployment');
 
